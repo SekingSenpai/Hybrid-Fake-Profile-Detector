@@ -201,7 +201,7 @@ def predict_distilbert(text: str) -> float:
     with torch.no_grad():
         logits = bert_model(**inputs).logits  # type: ignore[union-attr]
     probs = torch.softmax(logits, dim=-1)
-    
+
     # Check for strong spam / promotional keywords in bio
     text_lower = text.lower()
     spam_keywords = ["crypto", "free", "dm me", "link in bio", "whatsapp", "telegram", "cash", "giveaway", "invest", "bonus", "http", "www"]
@@ -209,7 +209,7 @@ def predict_distilbert(text: str) -> float:
 
     # LABEL_0 is Negative/Spam sentiment -> Fake Risk
     fake_prob = float(probs[0][0].item())
-    
+
     if has_spam_keyword and fake_prob < 0.7:
         fake_prob = max(fake_prob, 0.85)
 
