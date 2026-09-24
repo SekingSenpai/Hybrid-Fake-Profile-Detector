@@ -152,13 +152,18 @@ app.post("/analyze", async (req, res) => {
     let reasoningReport = null;
 
     if (genAI) {
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-      const prompt = buildPrompt(
-        { bio_text, avg_likes_per_post, avg_comments_per_post, url_ratio, ...metadata },
-        aiScores
-      );
-      const result = await model.generateContent(prompt);
-      reasoningReport = result.response.text();
+      try {
+        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+        const prompt = buildPrompt(
+          { bio_text, avg_likes_per_post, avg_comments_per_post, url_ratio, ...metadata },
+          aiScores
+        );
+        const result = await model.generateContent(prompt);
+        reasoningReport = result.response.text();
+      } catch (geminiErr) {
+        console.error("⚠️  Gemini API failed:", geminiErr.message);
+        reasoningReport = `Gemini reasoning unavailable (${geminiErr.status || 'error'}). Fallback analysis: Based on the ML scores (Combined: ${aiScores.combined_probability.toFixed(2)}), this profile shows ${aiScores.combined_probability > 0.5 ? "potential signs of inauthenticity" : "more authentic characteristics"}. Review the individual model scores for detailed analysis.`;
+      }
     } else {
       reasoningReport =
         "Gemini API key not configured — skipping reasoning report generation.";
@@ -171,6 +176,7 @@ app.post("/analyze", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ /analyze failed:", err.message);
+    console.error("Full error:", err);
 
     // Forward upstream HTTP errors when possible
     if (err.response) {
