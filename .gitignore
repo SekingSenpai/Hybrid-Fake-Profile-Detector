@@ -1,0 +1,19 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+ai_engine/models/
+
+# Node
+server/node_modules/
+server/package-lock.json
+client/node_modules/
+client/package-lock.json
+
+# OS
+.DS_Store
+Thumbs.db

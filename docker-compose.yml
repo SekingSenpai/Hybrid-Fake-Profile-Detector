@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  # ---- Python / FastAPI AI Engine ----
+  ai_engine:
+    build:
+      context: ./ai_engine
+      dockerfile: Dockerfile
+    container_name: ai_engine
+    ports:
+      - "8000:8000"
+    volumes:
+      - ai_models:/app/models          # persist placeholder model across restarts
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s               # DistilBERT download can take a while
+    restart: unless-stopped
+
+  # ---- Node.js / Express Gateway ----
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: server
+    ports:
+      - "3000:3000"
+    environment:
+      - AI_ENGINE_URL=http://ai_engine:8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash-lite}
+    depends_on:
+      ai_engine:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ai_models:

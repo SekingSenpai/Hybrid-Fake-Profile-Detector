@@ -1,0 +1,21 @@
+{
+  "name": "fake-profile-detector-gateway",
+  "version": "1.0.0",
+  "description": "Express gateway for the Hybrid Fake Profile Detector",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "axios": "^1.7.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.3",
+    "express": "^4.21.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
