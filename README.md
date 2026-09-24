@@ -1,200 +1,247 @@
-# 🎯 Hybrid Fake Profile Detector
+# Hybrid Fake Profile Detector
 
-A sophisticated ML-powered system for detecting fake social media profiles using a hybrid approach combining XGBoost, DistilBERT, and Gemini AI. Built with FastAPI, Express.js, and React.
+A local full-stack application for analyzing social-media profiles with an
+XGBoost profile/behavior model, a DistilBERT text model, and Gemini-generated
+reasoning reports.
 
-## 📋 Quick Navigation
+## Requirements
 
-- **[Quick Start](#-quick-start)** - Get running in 5 minutes
-- **[Full Documentation](README_FULL.md)** - Complete setup guide
-- **[Quick Start Text](QUICKSTART.txt)** - Plain text guide
+- Python 3.9 or newer
+- Node.js 20 or newer
+- npm
+- Git
+- A Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- At least 8 GB RAM recommended
 
-## ✨ Features
+The first AI Engine start downloads the DistilBERT model from Hugging Face.
+Internet access is required for that download and for Gemini reports.
 
-- ✅ Hybrid ML pipeline (XGBoost + DistilBERT)
-- ✅ Real-time profile analysis
-- ✅ Gemini AI-powered reasoning reports
-- ✅ Conflict detection when models disagree
-- ✅ REST API for easy integration
-- ✅ Modern React frontend
-- ✅ Docker support
-- ✅ Comprehensive logging
-
-## 🏗️ Architecture
-
-```
-React Client (Port 5173)
-        ↓
-Express Gateway (Port 3000)
-        ↓
-FastAPI AI Engine (Port 8000)
-    (XGBoost + DistilBERT + Gemini)
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Python 3.9+
-- Node.js 20.0+
-- Gemini API Key ([Get it here](https://aistudio.google.com/app/apikey))
-
-### 1️⃣ Clone & Setup
+## Clone the repository
 
 ```bash
 git clone https://github.com/SekingSenpai/Hybrid-Fake-Profile-Detector.git
 cd Hybrid-Fake-Profile-Detector
 ```
 
-### 2️⃣ Environment Setup
+The repository includes `ai_engine/models/xgboost_model.pkl`. Do not delete
+this file; the AI Engine loads it during startup. DistilBERT is downloaded and
+cached automatically.
+
+## Configuration
+
+### Windows PowerShell
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+Set the values in `.env`:
+
+```text
+GEMINI_API_KEY=your-gemini-api-key-here
+GEMINI_MODEL=gemini-2.0-flash
+AI_ENGINE_URL=http://localhost:8000
+```
+
+### macOS Terminal
 
 ```bash
 cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY
+open -e .env
 ```
 
-### 3️⃣ Install Dependencies
+Use the same values shown above. Keep `.env` private; it is ignored by Git.
 
-```bash
-# Python
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1  # Windows
-source .venv/bin/activate      # macOS/Linux
-cd ai_engine && pip install -r requirements.txt && cd ..
+## Windows setup and run
 
-# Node (Server)
-cd server && npm install && cd ..
+Open three separate PowerShell windows.
 
-# Node (Client)
-cd client && npm install && cd ..
+### 1. Install Python dependencies
+
+From the repository root:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r .\ai_engine\requirements.txt
 ```
 
-### 4️⃣ Run (3 Terminals)
+If PowerShell blocks activation, run this once in an elevated PowerShell:
 
-**Terminal 1 - AI Engine:**
-```bash
-cd ai_engine
-python main.py
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-**Terminal 2 - Server:**
-```bash
+### 2. Install Node dependencies
+
+```powershell
 cd server
+npm install
+cd ..\client
+npm install
+cd ..
+```
+
+### 3. Start the AI Engine
+
+Terminal 1:
+
+```powershell
+cd "F:\Code\Final Year Project"
+.\.venv\Scripts\Activate.ps1
+cd ai_engine
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Wait for `All models loaded - AI Engine ready.` before continuing.
+
+### 4. Start the server
+
+Terminal 2:
+
+```powershell
+cd "F:\Code\Final Year Project\server"
 npm start
 ```
 
-**Terminal 3 - Client:**
-```bash
-cd client
+The gateway runs at `http://localhost:3000`.
+
+### 5. Start the frontend
+
+Terminal 3:
+
+```powershell
+cd "F:\Code\Final Year Project\client"
 npm run dev
 ```
 
-### 5️⃣ Open in Browser
-```
-http://localhost:5173
-```
+Open `http://localhost:5173`.
 
----
+## macOS setup and run
 
-## 📖 Detailed Documentation
+Open three separate Terminal windows.
 
-For complete setup instructions, API details, and troubleshooting, see:
-- **[Full README](README_FULL.md)** - Comprehensive guide
-- **[QUICKSTART.txt](QUICKSTART.txt)** - Quick reference (plain text)
+### 1. Install Python dependencies
 
-## 🛠️ Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| **Backend ML** | FastAPI, XGBoost, PyTorch, DistilBERT |
-| **API Gateway** | Node.js, Express.js, Axios |
-| **Frontend** | React, Vite, Axios |
-| **AI Reasoning** | Google Gemini API |
-| **Deployment** | Docker, Docker Compose |
-
-## 📁 Project Structure
-
-```
-├── ai_engine/          # FastAPI ML service
-├── server/             # Express.js gateway
-├── client/             # React frontend
-├── README_FULL.md      # Full documentation
-├── QUICKSTART.txt      # Quick start guide
-└── docker-compose.yml  # Docker configuration
-```
-
-## 🔌 API Example
-
-**POST** `/analyze` (Express Gateway)
-```json
-{
-  "features": [1.0, 0.5, 1000, 500],
-  "bio_text": "I love travel and photography",
-  "avg_likes_per_post": 50,
-  "avg_comments_per_post": 10,
-  "url_ratio": 0.3
-}
-```
-
-Response:
-```json
-{
-  "scores": {
-    "combined_probability": 0.35,
-    "xgboost_score": 0.40,
-    "distilbert_score": 0.20,
-    "conflict_flag": false
-  },
-  "reasoning_report": "Detailed AI-generated analysis..."
-}
-```
-
-## 🐛 Common Issues
-
-| Issue | Solution |
-|-------|----------|
-| "GEMINI_API_KEY not set" | Check `.env` file in root directory |
-| "Cannot connect to AI Engine" | Ensure Terminal 1 is running |
-| "Port already in use" | Change port or kill existing process |
-| "DistilBERT timeout" | First run downloads model (~500MB), be patient |
-
-**More troubleshooting:** See [README_FULL.md](README_FULL.md#-troubleshooting)
-
-## 🐳 Docker Deployment
+From the repository root:
 
 ```bash
-docker-compose up
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install --upgrade pip
+python3 -m pip install -r ai_engine/requirements.txt
 ```
 
-Services run on:
-- AI Engine: http://localhost:8000
-- Server: http://localhost:3000
-- Client: http://localhost:5173
+### 2. Install Node dependencies
 
-## 📊 Model Information
-
-**XGBoost** (8 features):
-- Profile picture, username digits, followers, following
-- Account age, likes/post, comments/post, URL ratio
-
-**DistilBERT**:
-- Analyzes profile bio text
-- Fine-tuned for sentiment analysis
-
-**Scoring**:
-```
-Combined = 0.6 × XGBoost + 0.4 × DistilBERT
-Conflict = |XGBoost - DistilBERT| > 0.5
+```bash
+cd server
+npm install
+cd ../client
+npm install
+cd ..
 ```
 
-## 👨‍💻 Author
+### 3. Start the AI Engine
 
-**Arghadip Sarkar**  
-B.Tech CSE (AIML) | West Bengal, India  
-GitHub: [@SekingSenpai](https://github.com/SekingSenpai)
+Terminal 1:
 
-## 📝 License
+```bash
+cd /path/to/Hybrid-Fake-Profile-Detector
+source .venv/bin/activate
+cd ai_engine
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
-This is a Final Year Project for B.Tech in CSE (AIML).
+Wait for `All models loaded - AI Engine ready.` before continuing.
 
----
+### 4. Start the server
 
-**Need help?** Check [README_FULL.md](README_FULL.md) for detailed documentation.
+Terminal 2:
+
+```bash
+cd /path/to/Hybrid-Fake-Profile-Detector/server
+npm start
+```
+
+The gateway runs at `http://localhost:3000`.
+
+### 5. Start the frontend
+
+Terminal 3:
+
+```bash
+cd /path/to/Hybrid-Fake-Profile-Detector/client
+npm run dev
+```
+
+Open `http://localhost:5173`.
+
+## Service endpoints
+
+| Service | URL |
+| --- | --- |
+| React client | http://localhost:5173 |
+| Express gateway | http://localhost:3000 |
+| AI Engine | http://localhost:8000 |
+| AI Engine health check | http://localhost:8000/health |
+
+The frontend sends profile analysis requests to the Express gateway at
+`POST /analyze`. The gateway calls the AI Engine at `POST /predict` and then
+requests a Gemini forensic report. If Gemini is temporarily unavailable, a
+fallback report is returned while the local model scores remain available.
+
+## Model notes
+
+The XGBoost model expects these eight features, in order:
+
+1. Profile picture
+2. Digit ratio in username
+3. Followers
+4. Following
+5. Account age in days
+6. Average likes per post
+7. Average comments per post
+8. URL ratio
+
+The current DistilBERT checkpoint is the SST-2 sentiment model. Its output is
+used as a heuristic fake-risk signal, not as a formally trained fake-profile
+probability. Treat results as screening signals rather than definitive
+identity or fraud determinations.
+
+## Troubleshooting
+
+- **`GEMINI_API_KEY is not set`**: ensure `.env` is in the repository root and
+  restart the server.
+- **`getaddrinfo ENOTFOUND ai_engine`**: use
+  `AI_ENGINE_URL=http://localhost:8000` for local execution.
+- **`Unable to connect to the remote server` on port 8000**: start the AI
+  Engine first and wait for model loading to finish.
+- **Gemini `503 Service Unavailable`**: the configured model is busy or
+  temporarily unavailable. The gateway tries fallback models and returns a
+  local fallback report if needed.
+- **First startup is slow**: DistilBERT is downloaded and loaded once, then
+  reused from the local Hugging Face cache.
+
+## Docker
+
+For containerized execution:
+
+```bash
+docker compose up --build
+```
+
+Docker uses the service hostname `ai_engine`; local execution uses
+`http://localhost:8000`.
+
+## Project structure
+
+```text
+ai_engine/       FastAPI, XGBoost, and DistilBERT service
+server/          Express gateway and Gemini integration
+client/          React/Vite frontend
+.env.example     Safe environment-variable template
+docker-compose.yml
+```

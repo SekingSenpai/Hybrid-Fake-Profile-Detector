@@ -29,7 +29,8 @@ dotenv.config({ path: envPath });
 const PORT = process.env.PORT || 3000;
 const AI_ENGINE_URL = process.env.AI_ENGINE_URL || "http://ai_engine:8000";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const FALLBACK_GEMINI_MODEL = "gemini-1.5-flash";
 
 if (!GEMINI_API_KEY) {
   console.warn(
@@ -41,6 +42,27 @@ if (!GEMINI_API_KEY) {
 // Gemini client (lazy — only instantiated when key exists)
 // ---------------------------------------------------------------------------
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
+
+async function getGeminiReasoning(profileData, aiScores) {
+  if (!genAI) {
+    return "Gemini API key not configured — skipping reasoning report generation.";
+  }
+  const prompt = buildPrompt(profileData, aiScores);
+  const modelsToTry = [GEMINI_MODEL, FALLBACK_GEMINI_MODEL, "gemini-2.5-flash"];
+
+  for (const modelName of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch (geminiErr) {
+      console.warn(`⚠️ Gemini API model ${modelName} failed (${geminiErr.status || geminiErr.message}). Retrying...`);
+    }
+  }
+
+  // Fallback if all Gemini attempts fail
+  return `Gemini reasoning temporarily busy. Fallback analysis: Based on the ML scores (Combined Risk: ${(aiScores.combined_probability * 100).toFixed(1)}%), this profile is classified as ${aiScores.combined_probability >= 0.7 ? "FAKE" : aiScores.combined_probability >= 0.4 ? "SUSPICIOUS" : "GENUINE"}.`;
+}
 
 // ---------------------------------------------------------------------------
 // Prompt template
@@ -149,25 +171,10 @@ app.post("/analyze", async (req, res) => {
     const aiScores = aiResponse.data;
 
     // ---- Step 2: call Gemini for Reasoning Report ----
-    let reasoningReport = null;
-
-    if (genAI) {
-      try {
-        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-        const prompt = buildPrompt(
-          { bio_text, avg_likes_per_post, avg_comments_per_post, url_ratio, ...metadata },
-          aiScores
-        );
-        const result = await model.generateContent(prompt);
-        reasoningReport = result.response.text();
-      } catch (geminiErr) {
-        console.error("⚠️  Gemini API failed:", geminiErr.message);
-        reasoningReport = `Gemini reasoning unavailable (${geminiErr.status || 'error'}). Fallback analysis: Based on the ML scores (Combined: ${aiScores.combined_probability.toFixed(2)}), this profile shows ${aiScores.combined_probability > 0.5 ? "potential signs of inauthenticity" : "more authentic characteristics"}. Review the individual model scores for detailed analysis.`;
-      }
-    } else {
-      reasoningReport =
-        "Gemini API key not configured — skipping reasoning report generation.";
-    }
+    const reasoningReport = await getGeminiReasoning(
+      { bio_text, avg_likes_per_post, avg_comments_per_post, url_ratio, ...metadata },
+      aiScores
+    );
 
     // ---- Step 3: respond ----
     return res.json({

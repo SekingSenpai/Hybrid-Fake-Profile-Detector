@@ -7,6 +7,9 @@ __pycache__/
 *.pyo
 .venv/
 ai_engine/models/
+!ai_engine/models/
+ai_engine/models/*
+!ai_engine/models/xgboost_model.pkl
 
 # Node
 server/node_modules/

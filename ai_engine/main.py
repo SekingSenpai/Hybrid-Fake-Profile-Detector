@@ -184,7 +184,11 @@ def predict_xgboost(features: list[float]) -> float:
 
 
 def predict_distilbert(text: str) -> float:
-    """Return the positive‑class probability from DistilBERT."""
+    """Return the fake/spam probability from DistilBERT.
+    Note: SST-2 model labels:
+      LABEL_0 -> Negative/Promotional/Spam sentiment (High Fake Risk)
+      LABEL_1 -> Positive/Authentic sentiment (Low Fake Risk)
+    """
     inputs = tokenizer(  # type: ignore[misc]
         text,
         return_tensors="pt",
@@ -197,8 +201,19 @@ def predict_distilbert(text: str) -> float:
     with torch.no_grad():
         logits = bert_model(**inputs).logits  # type: ignore[union-attr]
     probs = torch.softmax(logits, dim=-1)
-    # Index 1 → positive class
-    return float(probs[0][1].item())
+    
+    # Check for strong spam / promotional keywords in bio
+    text_lower = text.lower()
+    spam_keywords = ["crypto", "free", "dm me", "link in bio", "whatsapp", "telegram", "cash", "giveaway", "invest", "bonus", "http", "www"]
+    has_spam_keyword = any(kw in text_lower for kw in spam_keywords)
+
+    # LABEL_0 is Negative/Spam sentiment -> Fake Risk
+    fake_prob = float(probs[0][0].item())
+    
+    if has_spam_keyword and fake_prob < 0.7:
+        fake_prob = max(fake_prob, 0.85)
+
+    return fake_prob
 
 
 # ---------------------------------------------------------------------------

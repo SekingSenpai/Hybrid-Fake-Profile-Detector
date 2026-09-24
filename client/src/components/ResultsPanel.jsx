@@ -1,14 +1,14 @@
 import Markdown from 'react-markdown';
 
 function getVerdictClass(combined) {
-  if (combined >= 0.7) return 'fake';
-  if (combined >= 0.4) return 'suspicious';
+  if (combined >= 0.65) return 'fake';
+  if (combined >= 0.35) return 'suspicious';
   return 'genuine';
 }
 
 function getVerdictText(combined) {
-  if (combined >= 0.7) return 'FAKE';
-  if (combined >= 0.4) return 'SUSPICIOUS';
+  if (combined >= 0.65) return 'FAKE';
+  if (combined >= 0.35) return 'SUSPICIOUS';
   return 'GENUINE';
 }
 
