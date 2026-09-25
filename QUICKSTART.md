@@ -17,10 +17,46 @@ GEMINI_MODEL=gemini-3.5-flash-lite
 ### 2. Virtual Environment (Already exists)
 The Python virtual environment (`.venv`) is already set up in the root directory.
 
-### 3. Dependencies (Already installed)
+### 3. Install dependencies
+
+```powershell
+cd "F:\Code\Final Year Project"
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r .\ai_engine\requirements.txt
+```
+
+For an NVIDIA RTX 50-series GPU:
+
+```powershell
+python -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/cu130
+```
+
+The trained model artifacts are included in `ai_engine/models/`. Install Git
+LFS before cloning so the fine-tuned DistilBERT weights are downloaded.
+
+### 4. Dependencies
 - `ai_engine/`: Python dependencies installed via pip
 - `server/`: Node dependencies in `node_modules`
 - `client/`: Node dependencies in `node_modules`
+
+---
+
+### 5. Optional: retrain both models
+
+```powershell
+cd "F:\Code\Final Year Project\ai_engine"
+python .\train.py
+python .\fine_tune_distilbert.py `
+  --fake ".\model_traning\fake_account.csv" `
+  --legitimate ".\model_traning\legitimate_account.csv" `
+  --max-samples-per-class 20000 `
+  --epochs 3 `
+  --batch-size 16
+```
+
+`train.py` saves the production XGBoost model and
+`models\xgboost_experiments.json`. The fine-tuning script saves the
+DistilBERT checkpoint to `models\distilbert-finetuned`.
 
 ---
 
@@ -30,9 +66,9 @@ Open **3 separate PowerShell terminals** and run these commands:
 
 ### Terminal 1: AI Engine (FastAPI)
 ```powershell
-cd "f:\Code\Final Year Project"
+cd "F:\Code\Final Year Project"
 .\.venv\Scripts\Activate.ps1
-cd ai_engine
+cd .\ai_engine
 python main.py
 ```
 ✅ Runs on: **http://localhost:8000**
@@ -138,4 +174,3 @@ cd "f:\Code\Final Year Project"
 - All three services must be running for the app to work fully
 - Environment variables are auto-loaded from `.env` in the root directory
 - Check the terminal logs for any errors or issues
-

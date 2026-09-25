@@ -1,143 +1,209 @@
-import pandas as pd
-import xgboost as xgb
-import joblib
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+"""Train XGBoost from profiles plus real behavioral activity aggregates."""
+
+from __future__ import annotations
+
+import argparse
+import json
 from pathlib import Path
-import os
 
-def train_model():
-    # ---------------------------------------------------------------
-    # 1. Load BOTH Kaggle datasets
-    # ---------------------------------------------------------------
-    profiles_path = r"model_traning\archive (2)\raw_user_profiles.csv"
-    activities_path = r"model_traning\archive (2)\raw_user_activities.csv"
+import joblib
+import numpy as np
+import pandas as pd
+import torch
+import xgboost as xgb
+from sklearn.inspection import permutation_importance
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import train_test_split
 
-    if not os.path.exists(profiles_path):
-        print(f"Error: {profiles_path} not found.")
-        return
-    if not os.path.exists(activities_path):
-        print(f"Error: {activities_path} not found.")
-        return
+FEATURES = [
+    "profile_pic",
+    "nums_in_username",
+    "followers",
+    "following",
+    "account_age",
+    "avg_likes_per_post",
+    "avg_comments_per_post",
+    "url_ratio",
+]
 
-    profiles_df = pd.read_csv(profiles_path)
-    activities_df = pd.read_csv(activities_path)
 
-    print(f"Loaded {len(profiles_df)} profiles and {len(activities_df)} activity records.")
-
-    # ---------------------------------------------------------------
-    # 2. Engineer behavioral features from the activities dataset
-    # ---------------------------------------------------------------
-    # Group all activities by user_id and compute aggregated metrics
-    behavior = activities_df.groupby("user_id").agg(
+def load_dataset(profiles_path: Path, activities_path: Path) -> tuple[pd.DataFrame, pd.Series]:
+    profiles = pd.read_csv(profiles_path)
+    activities = pd.read_csv(activities_path)
+    behavior = activities.groupby("user_id").agg(
         avg_likes=("likes", "mean"),
         avg_comments=("comments", "mean"),
         total_posts=("activity_id", "count"),
         posts_with_url=("contains_url", "sum"),
     ).reset_index()
-
-    # URL ratio: what fraction of a user's posts contain external links
     behavior["url_ratio"] = behavior["posts_with_url"] / behavior["total_posts"]
-    behavior["url_ratio"] = behavior["url_ratio"].fillna(0.0)
+    data = profiles.merge(behavior, on="user_id", how="inner")
 
-    print(f"Computed behavioral features for {len(behavior)} unique users.")
+    username = data["username"].fillna("").astype(str)
+    username_length = username.str.len().replace(0, np.nan)
+    frame = pd.DataFrame(
+        {
+            "profile_pic": data["profile_picture"].astype(float),
+            "nums_in_username": username.str.count(r"\d").div(username_length).fillna(0),
+            "followers": data["followers_count"].astype(float),
+            "following": data["following_count"].astype(float),
+            "account_age": data["account_age_days"].astype(float),
+            "avg_likes_per_post": data["avg_likes"].astype(float),
+            "avg_comments_per_post": data["avg_comments"].astype(float),
+            "url_ratio": data["url_ratio"].astype(float),
+        }
+    )
+    labels = data["is_fake"].astype(int)
+    valid = frame.notna().all(axis=1) & labels.isin([0, 1])
+    return frame.loc[valid].astype("float32"), labels.loc[valid]
 
-    # ---------------------------------------------------------------
-    # 3. Merge profiles + behavioral features on user_id
-    # ---------------------------------------------------------------
-    merged = profiles_df.merge(behavior, on="user_id", how="inner")
-    print(f"Merged dataset contains {len(merged)} profiles with behavioral data.")
 
-    # ---------------------------------------------------------------
-    # 4. Preprocess profile-level features (same as before)
-    # ---------------------------------------------------------------
-    # Profile picture: boolean -> float
-    merged['profile_pic'] = merged['profile_picture'].astype(float)
+def make_model() -> xgb.XGBClassifier:
+    return xgb.XGBClassifier(
+        n_estimators=250,
+        max_depth=4,
+        learning_rate=0.05,
+        subsample=0.85,
+        colsample_bytree=0.9,
+        min_child_weight=5,
+        reg_lambda=5.0,
+        reg_alpha=0.1,
+        eval_metric="logloss",
+        tree_method="hist",
+        device="cuda" if torch.cuda.is_available() else "cpu",
+        random_state=42,
+    )
 
-    # Calculate ratio of digits in username
-    def calc_num_ratio(username):
-        s = str(username)
-        if len(s) == 0:
-            return 0.0
-        return sum(c.isdigit() for c in s) / len(s)
 
-    merged['nums_in_username'] = merged['username'].apply(calc_num_ratio)
+def evaluate_model(
+    name: str,
+    model: xgb.XGBClassifier,
+    X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+    y_train: pd.Series,
+    y_test: pd.Series,
+) -> dict[str, object]:
+    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
+    probabilities = model.predict_proba(X_test)[:, 1]
+    predictions = (probabilities >= 0.5).astype(int)
+    return {
+        "experiment": name,
+        "features": list(X_train.columns),
+        "accuracy": accuracy_score(y_test, predictions),
+        "precision": precision_score(y_test, predictions, zero_division=0),
+        "recall": recall_score(y_test, predictions, zero_division=0),
+        "f1": f1_score(y_test, predictions, zero_division=0),
+        "roc_auc": roc_auc_score(y_test, probabilities),
+        "classification_report": classification_report(
+            y_test, predictions, target_names=["Genuine", "Fake"], output_dict=True
+        ),
+    }
 
-    # Map other columns directly
-    merged['followers'] = merged['followers_count'].astype(float)
-    merged['following'] = merged['following_count'].astype(float)
-    merged['account_age'] = merged['account_age_days'].astype(float)
 
-    # Behavioral features are already floats from the aggregation
-    merged['avg_likes_per_post'] = merged['avg_likes'].astype(float)
-    merged['avg_comments_per_post'] = merged['avg_comments'].astype(float)
-    # url_ratio is already computed above
-
-    # Target variable
-    merged['is_fake_label'] = merged['is_fake'].astype(int)
-
-    # ---------------------------------------------------------------
-    # 5. Define the 8-feature vector and split
-    # ---------------------------------------------------------------
-    features = [
-        'profile_pic',           # 0: Has profile picture (0/1)
-        'nums_in_username',      # 1: Ratio of digits in username
-        'followers',             # 2: Follower count
-        'following',             # 3: Following count
-        'account_age',           # 4: Account age in days
-        'avg_likes_per_post',    # 5: Average likes per post   [NEW]
-        'avg_comments_per_post', # 6: Average comments per post [NEW]
-        'url_ratio',             # 7: Fraction of posts with URLs [NEW]
-    ]
-
-    X = merged[features]
-    y = merged['is_fake_label']
-
+def train_model(
+    profiles_path: Path,
+    activities_path: Path,
+    output_path: Path,
+    report_path: Path,
+) -> None:
+    X, y = load_dataset(profiles_path, activities_path)
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+        X, y, test_size=0.2, random_state=42, stratify=y
     )
-
-    print(f"\nTraining set: {len(X_train)} | Test set: {len(X_test)}")
-    print("Training XGBoost Model with 8 features (profile + behavioral)...\n")
-
-    # ---------------------------------------------------------------
-    # 6. Train the XGBoost Model
-    # ---------------------------------------------------------------
-    model = xgb.XGBClassifier(
-        n_estimators=150,
-        max_depth=5,
-        learning_rate=0.1,
-        use_label_encoder=False,
-        eval_metric='logloss',
+    model = make_model()
+    main_metrics = evaluate_model("all_features", model, X_train, X_test, y_train, y_test)
+    print(
+        f"Rows: {len(X)} | test: {len(X_test)} | "
+        f"device: {model.get_xgb_params()['device']}"
     )
-    model.fit(X_train, y_train)
+    print(json.dumps({key: main_metrics[key] for key in (
+        "accuracy", "precision", "recall", "f1", "roc_auc"
+    )}, indent=2))
 
-    # ---------------------------------------------------------------
-    # 7. Evaluate
-    # ---------------------------------------------------------------
-    predictions = model.predict(X_test)
-    accuracy = accuracy_score(y_test, predictions)
+    gain = model.feature_importances_
+    permutation = permutation_importance(
+        model, X_test, y_test, n_repeats=5, random_state=42, scoring="accuracy"
+    ).importances_mean
+    print("Feature importance (gain / permutation):")
+    for name, gain_score, permutation_score in zip(FEATURES, gain, permutation):
+        print(f"  {name:25s} {gain_score:.4f} / {permutation_score:.4f}")
 
-    print("Training Complete!")
-    print(f"Model Accuracy on Test Data: {accuracy * 100:.2f}%\n")
-    print("Classification Report:")
-    print(classification_report(y_test, predictions, target_names=["Genuine", "Fake"]))
+    experiments = [main_metrics]
+    ablations = {
+        "without_account_age": [feature for feature in FEATURES if feature != "account_age"],
+        "without_profile_picture": [
+            feature for feature in FEATURES if feature != "profile_pic"
+        ],
+        "profile_only": [
+            "profile_pic", "nums_in_username", "followers", "following", "account_age"
+        ],
+        "behavior_only": [
+            "avg_likes_per_post", "avg_comments_per_post", "url_ratio"
+        ],
+    }
+    for name, selected_features in ablations.items():
+        ablation_model = make_model()
+        experiments.append(
+            evaluate_model(
+                name,
+                ablation_model,
+                X_train[selected_features],
+                X_test[selected_features],
+                y_train,
+                y_test,
+            )
+        )
 
-    # Feature importance
-    print("Feature Importance:")
-    for name, score in zip(features, model.feature_importances_):
-        print(f"  {name:25s} -> {score:.4f}")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(
+            {
+                "dataset": {
+                    "profiles": str(profiles_path),
+                    "activities": str(activities_path),
+                    "rows": len(X),
+                    "label_counts": y.value_counts().to_dict(),
+                },
+                "feature_importance": {
+                    name: {
+                        "gain": float(gain_score),
+                        "permutation": float(permutation_score),
+                    }
+                    for name, gain_score, permutation_score in zip(
+                        FEATURES, gain, permutation
+                    )
+                },
+                "experiments": experiments,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    print(f"Saved experiment report to {report_path}")
 
-    # ---------------------------------------------------------------
-    # 8. Save the Model
-    # ---------------------------------------------------------------
-    model_dir = Path("models")
-    model_dir.mkdir(parents=True, exist_ok=True)
-
-    model_path = model_dir / "xgboost_model.pkl"
-    joblib.dump(model, model_path)
-    print(f"\nModel successfully saved to: {model_path}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, output_path)
+    print(f"Saved XGBoost model to {output_path}")
 
 
 if __name__ == "__main__":
-    train_model()
+    root = Path(__file__).resolve().parent
+    parser = argparse.ArgumentParser()
+    data = root / "model_traning" / "archive (2)"
+    parser.add_argument("--profiles", type=Path, default=data / "raw_user_profiles.csv")
+    parser.add_argument("--activities", type=Path, default=data / "raw_user_activities.csv")
+    parser.add_argument("--output", type=Path, default=root / "models" / "xgboost_model.pkl")
+    parser.add_argument(
+        "--report",
+        type=Path,
+        default=root / "models" / "xgboost_experiments.json",
+    )
+    args = parser.parse_args()
+    train_model(args.profiles, args.activities, args.output, args.report)
