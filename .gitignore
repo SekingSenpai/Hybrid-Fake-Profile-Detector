@@ -10,6 +10,9 @@ ai_engine/models/
 !ai_engine/models/
 ai_engine/models/*
 !ai_engine/models/xgboost_model.pkl
+!ai_engine/models/distilbert-finetuned/
+!ai_engine/models/distilbert-finetuned/**
+!ai_engine/models/xgboost_experiments.json
 
 # Node
 server/node_modules/

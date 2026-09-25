@@ -6,7 +6,7 @@ Terminal instructions.
 
 For a quick reference, start the services in three terminals:
 
-1. AI Engine: `python -m uvicorn main:app --host 0.0.0.0 --port 8000`
+1. AI Engine: `python main.py`
 2. Server: `npm start`
 3. Client: `npm run dev`
 

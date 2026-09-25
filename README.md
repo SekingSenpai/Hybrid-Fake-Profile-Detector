@@ -92,7 +92,7 @@ Terminal 1:
 cd "F:\Code\Final Year Project"
 .\.venv\Scripts\Activate.ps1
 cd ai_engine
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
+python main.py
 ```
 
 Wait for `All models loaded - AI Engine ready.` before continuing.
@@ -152,7 +152,7 @@ Terminal 1:
 cd /path/to/Hybrid-Fake-Profile-Detector
 source .venv/bin/activate
 cd ai_engine
-python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
+python3 main.py
 ```
 
 Wait for `All models loaded - AI Engine ready.` before continuing.
@@ -206,10 +206,39 @@ The XGBoost model expects these eight features, in order:
 7. Average comments per post
 8. URL ratio
 
-The current DistilBERT checkpoint is the SST-2 sentiment model. Its output is
-used as a heuristic fake-risk signal, not as a formally trained fake-profile
-probability. Treat results as screening signals rather than definitive
-identity or fraud determinations.
+The fine-tuned DistilBERT checkpoint predicts `GENUINE` or `FAKE` from profile
+text. The API also applies a conservative gibberish-text signal. Treat results
+as screening signals rather than definitive identity or fraud determinations.
+
+## Retrain with the new datasets
+
+Place the datasets in `ai_engine/model_traning`. The included training
+command uses the profile/activity archive and runs feature-ablation
+experiments. The DistilBERT command uses the `fake_account.csv` and
+`legitimate_account.csv` corpora. Run them from `ai_engine`:
+
+```powershell
+python .\train.py
+python .\fine_tune_distilbert.py --max-samples-per-class 20000
+```
+
+The XGBoost training command also runs reproducible ablation experiments:
+all features, without account age, without profile-picture data, profile-only,
+and behavior-only. It reports accuracy, precision, recall, F1, ROC-AUC, gain
+importance, and permutation importance. The full results are saved to
+`ai_engine/models/xgboost_experiments.json` for the project report. The
+all-feature model remains the production model; the ablations measure dataset
+bias and feature dependence rather than forcing artificial equal weights.
+
+XGBoost saves `models\xgboost_model.pkl` and
+`models\xgboost_experiments.json`. DistilBERT saves
+`models\distilbert-finetuned`. Both scripts use CUDA automatically when
+PyTorch detects an NVIDIA GPU. For RTX 50-series GPUs, install CUDA 13
+PyTorch before the requirements:
+
+```powershell
+python -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/cu130
+```
 
 ## Troubleshooting
 

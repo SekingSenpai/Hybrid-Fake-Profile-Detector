@@ -1,0 +1,262 @@
+{
+  "dataset": {
+    "profiles": "F:\\Code\\Final Year Project\\ai_engine\\model_traning\\archive (2)\\raw_user_profiles.csv",
+    "activities": "F:\\Code\\Final Year Project\\ai_engine\\model_traning\\archive (2)\\raw_user_activities.csv",
+    "rows": 5000,
+    "label_counts": {
+      "0": 3751,
+      "1": 1249
+    }
+  },
+  "feature_importance": {
+    "profile_pic": {
+      "gain": 0.03995678201317787,
+      "permutation": 0.0028000000000000026
+    },
+    "nums_in_username": {
+      "gain": 0.021130304783582687,
+      "permutation": 0.0006000000000000005
+    },
+    "followers": {
+      "gain": 0.021950852125883102,
+      "permutation": 0.001200000000000001
+    },
+    "following": {
+      "gain": 0.07126984000205994,
+      "permutation": 0.005800000000000005
+    },
+    "account_age": {
+      "gain": 0.665076732635498,
+      "permutation": 0.19899999999999995
+    },
+    "avg_likes_per_post": {
+      "gain": 0.03744455426931381,
+      "permutation": 0.009200000000000009
+    },
+    "avg_comments_per_post": {
+      "gain": 0.14317092299461365,
+      "permutation": 0.03400000000000003
+    },
+    "url_ratio": {
+      "gain": 0.0,
+      "permutation": 0.0
+    }
+  },
+  "experiments": [
+    {
+      "experiment": "all_features",
+      "features": [
+        "profile_pic",
+        "nums_in_username",
+        "followers",
+        "following",
+        "account_age",
+        "avg_likes_per_post",
+        "avg_comments_per_post",
+        "url_ratio"
+      ],
+      "accuracy": 0.976,
+      "precision": 0.9556451612903226,
+      "recall": 0.948,
+      "f1": 0.9518072289156626,
+      "roc_auc": 0.99768,
+      "classification_report": {
+        "Genuine": {
+          "precision": 0.9827127659574468,
+          "recall": 0.9853333333333333,
+          "f1-score": 0.9840213049267643,
+          "support": 750.0
+        },
+        "Fake": {
+          "precision": 0.9556451612903226,
+          "recall": 0.948,
+          "f1-score": 0.9518072289156626,
+          "support": 250.0
+        },
+        "accuracy": 0.976,
+        "macro avg": {
+          "precision": 0.9691789636238848,
+          "recall": 0.9666666666666666,
+          "f1-score": 0.9679142669212135,
+          "support": 1000.0
+        },
+        "weighted avg": {
+          "precision": 0.9759458647906658,
+          "recall": 0.976,
+          "f1-score": 0.9759677859239889,
+          "support": 1000.0
+        }
+      }
+    },
+    {
+      "experiment": "without_account_age",
+      "features": [
+        "profile_pic",
+        "nums_in_username",
+        "followers",
+        "following",
+        "avg_likes_per_post",
+        "avg_comments_per_post",
+        "url_ratio"
+      ],
+      "accuracy": 0.971,
+      "precision": 0.9585062240663901,
+      "recall": 0.924,
+      "f1": 0.9409368635437881,
+      "roc_auc": 0.9925173333333333,
+      "classification_report": {
+        "Genuine": {
+          "precision": 0.9749670619235836,
+          "recall": 0.9866666666666667,
+          "f1-score": 0.9807819748177601,
+          "support": 750.0
+        },
+        "Fake": {
+          "precision": 0.9585062240663901,
+          "recall": 0.924,
+          "f1-score": 0.9409368635437881,
+          "support": 250.0
+        },
+        "accuracy": 0.971,
+        "macro avg": {
+          "precision": 0.9667366429949869,
+          "recall": 0.9553333333333334,
+          "f1-score": 0.9608594191807741,
+          "support": 1000.0
+        },
+        "weighted avg": {
+          "precision": 0.9708518524592853,
+          "recall": 0.971,
+          "f1-score": 0.9708206969992671,
+          "support": 1000.0
+        }
+      }
+    },
+    {
+      "experiment": "without_profile_picture",
+      "features": [
+        "nums_in_username",
+        "followers",
+        "following",
+        "account_age",
+        "avg_likes_per_post",
+        "avg_comments_per_post",
+        "url_ratio"
+      ],
+      "accuracy": 0.973,
+      "precision": 0.951417004048583,
+      "recall": 0.94,
+      "f1": 0.9456740442655935,
+      "roc_auc": 0.9972586666666667,
+      "classification_report": {
+        "Genuine": {
+          "precision": 0.9800796812749004,
+          "recall": 0.984,
+          "f1-score": 0.9820359281437125,
+          "support": 750.0
+        },
+        "Fake": {
+          "precision": 0.951417004048583,
+          "recall": 0.94,
+          "f1-score": 0.9456740442655935,
+          "support": 250.0
+        },
+        "accuracy": 0.973,
+        "macro avg": {
+          "precision": 0.9657483426617417,
+          "recall": 0.962,
+          "f1-score": 0.963854986204653,
+          "support": 1000.0
+        },
+        "weighted avg": {
+          "precision": 0.9729140119683211,
+          "recall": 0.973,
+          "f1-score": 0.9729454571741828,
+          "support": 1000.0
+        }
+      }
+    },
+    {
+      "experiment": "profile_only",
+      "features": [
+        "profile_pic",
+        "nums_in_username",
+        "followers",
+        "following",
+        "account_age"
+      ],
+      "accuracy": 0.962,
+      "precision": 0.9076923076923077,
+      "recall": 0.944,
+      "f1": 0.9254901960784314,
+      "roc_auc": 0.9919093333333332,
+      "classification_report": {
+        "Genuine": {
+          "precision": 0.981081081081081,
+          "recall": 0.968,
+          "f1-score": 0.974496644295302,
+          "support": 750.0
+        },
+        "Fake": {
+          "precision": 0.9076923076923077,
+          "recall": 0.944,
+          "f1-score": 0.9254901960784314,
+          "support": 250.0
+        },
+        "accuracy": 0.962,
+        "macro avg": {
+          "precision": 0.9443866943866943,
+          "recall": 0.956,
+          "f1-score": 0.9499934201868667,
+          "support": 1000.0
+        },
+        "weighted avg": {
+          "precision": 0.9627338877338878,
+          "recall": 0.962,
+          "f1-score": 0.9622450322410844,
+          "support": 1000.0
+        }
+      }
+    },
+    {
+      "experiment": "behavior_only",
+      "features": [
+        "avg_likes_per_post",
+        "avg_comments_per_post",
+        "url_ratio"
+      ],
+      "accuracy": 0.958,
+      "precision": 0.9482758620689655,
+      "recall": 0.88,
+      "f1": 0.9128630705394191,
+      "roc_auc": 0.9843946666666666,
+      "classification_report": {
+        "Genuine": {
+          "precision": 0.9609375,
+          "recall": 0.984,
+          "f1-score": 0.9723320158102767,
+          "support": 750.0
+        },
+        "Fake": {
+          "precision": 0.9482758620689655,
+          "recall": 0.88,
+          "f1-score": 0.9128630705394191,
+          "support": 250.0
+        },
+        "accuracy": 0.958,
+        "macro avg": {
+          "precision": 0.9546066810344828,
+          "recall": 0.9319999999999999,
+          "f1-score": 0.9425975431748479,
+          "support": 1000.0
+        },
+        "weighted avg": {
+          "precision": 0.9577720905172414,
+          "recall": 0.958,
+          "f1-score": 0.9574647794925623,
+          "support": 1000.0
+        }
+      }
+    }
+  ]
+}

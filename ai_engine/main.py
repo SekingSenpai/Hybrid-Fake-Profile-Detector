@@ -23,6 +23,7 @@ from typing import Any
 import joblib
 import numpy as np
 import xgboost as xgb
+import uvicorn
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -46,8 +47,9 @@ XGBOOST_MODEL_PATH = os.getenv(
 )
 DISTILBERT_MODEL_NAME = os.getenv(
     "DISTILBERT_MODEL_NAME",
-    "distilbert-base-uncased-finetuned-sst-2-english",
+    str(Path(__file__).resolve().parent / "models" / "distilbert-finetuned"),
 )
+DISTILBERT_FALLBACK_MODEL_NAME = "distilbert-base-uncased-finetuned-sst-2-english"
 XGBOOST_WEIGHT = 0.6
 DISTILBERT_WEIGHT = 0.4
 CONFLICT_THRESHOLD = 0.5
@@ -58,7 +60,8 @@ CONFLICT_THRESHOLD = 0.5
 xgb_model: xgb.XGBClassifier | None = None
 tokenizer: AutoTokenizer | None = None
 bert_model: AutoModelForSequenceClassification | None = None
-device: torch.device = torch.device("cpu")
+device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+distilbert_fake_label = 1
 
 
 # ---------------------------------------------------------------------------
@@ -96,11 +99,28 @@ def _load_xgboost() -> xgb.XGBClassifier:
 
 
 def _load_distilbert() -> tuple[AutoTokenizer, AutoModelForSequenceClassification]:
-    logger.info("Loading DistilBERT tokenizer & model: %s", DISTILBERT_MODEL_NAME)
-    tok = AutoTokenizer.from_pretrained(DISTILBERT_MODEL_NAME)
-    mdl = AutoModelForSequenceClassification.from_pretrained(DISTILBERT_MODEL_NAME)
+    model_name = (
+        DISTILBERT_MODEL_NAME
+        if Path(DISTILBERT_MODEL_NAME).exists()
+        else DISTILBERT_FALLBACK_MODEL_NAME
+    )
+    if model_name != DISTILBERT_MODEL_NAME:
+        logger.warning(
+            "Fine-tuned DistilBERT not found at %s; using fallback checkpoint %s",
+            DISTILBERT_MODEL_NAME,
+            model_name,
+        )
+    logger.info("Loading DistilBERT tokenizer & model: %s", model_name)
+    tok = AutoTokenizer.from_pretrained(model_name)
+    mdl = AutoModelForSequenceClassification.from_pretrained(model_name)
     mdl.to(device)
     mdl.eval()
+    global distilbert_fake_label
+    labels = {str(value).upper() for value in mdl.config.id2label.values()}
+    distilbert_fake_label = next(
+        (index for index, label in mdl.config.id2label.items() if "FAKE" in str(label).upper()),
+        0 if "NEGATIVE" in labels else 1,
+    )
     return tok, mdl
 
 
@@ -184,11 +204,7 @@ def predict_xgboost(features: list[float]) -> float:
 
 
 def predict_distilbert(text: str) -> float:
-    """Return the fake/spam probability from DistilBERT.
-    Note: SST-2 model labels:
-      LABEL_0 -> Negative/Promotional/Spam sentiment (High Fake Risk)
-      LABEL_1 -> Positive/Authentic sentiment (Low Fake Risk)
-    """
+    """Return the probability assigned to the model's fake-risk label."""
     inputs = tokenizer(  # type: ignore[misc]
         text,
         return_tensors="pt",
@@ -207,8 +223,7 @@ def predict_distilbert(text: str) -> float:
     spam_keywords = ["crypto", "free", "dm me", "link in bio", "whatsapp", "telegram", "cash", "giveaway", "invest", "bonus", "http", "www"]
     has_spam_keyword = any(kw in text_lower for kw in spam_keywords)
 
-    # LABEL_0 is Negative/Spam sentiment -> Fake Risk
-    fake_prob = float(probs[0][0].item())
+    fake_prob = float(probs[0][distilbert_fake_label].item())
 
     if has_spam_keyword and fake_prob < 0.7:
         fake_prob = max(fake_prob, 0.85)
@@ -269,3 +284,7 @@ async def predict(payload: ProfileFeatures) -> PredictionResponse:
         distilbert_score=round(bert_score, 6),
         conflict_flag=conflict,
     )
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
